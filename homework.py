@@ -3,6 +3,7 @@ import os
 import requests
 import sys
 import time as t
+import time
 
 from dotenv import load_dotenv
 from http import HTTPStatus
@@ -47,7 +48,6 @@ def send_message(bot, message):
 
 def get_api_answer(current_timestamp):
     """Получение ответа API Практикум.Домашка."""
-    resp = []
     timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
