@@ -6,10 +6,8 @@ import time as t
 
 from dotenv import load_dotenv
 from http import HTTPStatus
-from json.decoder import JSONDecodeError
 from telegram import Bot
-from requests.exceptions import ConnectionError, ConnectTimeout
-from requests.exceptions import HTTPError, ReadTimeout, Timeout
+from exceptions import (ApiJsonErorr, ApiNotAvailable)
 
 load_dotenv()
 
@@ -50,37 +48,25 @@ def send_message(bot, message):
 def get_api_answer(current_timestamp):
     """Получение ответа API Практикум.Домашка."""
     resp = []
-    timestamp = current_timestamp
-    # try:
-    #    t.time(timestamp)
-    # except Exception('Неправильный формат времени'):
-    #    logger.error('Неправильный формат времени')
-    # else:
+    timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
-        params['from_date'] == current_timestamp
-        response = requests.get(url=ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code == HTTPStatus.OK:
-            resp = response.json()
-        else:
-            raise SystemError(
-                f'Недоступен API Практикум.Домашка {response.status_code}'
-            )
-    except ConnectTimeout:
-        logger.error('Connect Timeout')
-    except ConnectionError:
-        logger.error('Connection Error')
-    except ReadTimeout:
-        logger.error('Read Timeout')
-    except Timeout:
-        logger.error('Timeout')
-    except HTTPError:
-        logger.error('HTTP Error')
-    except JSONDecodeError:
-        logger.error('JSON Decode Error')
-    else:
-        logger.info('Сайт API Практикум.Домашка доступен')
-        return resp
+        response = requests.get(ENDPOINT, headers=HEADERS, params=params)
+    except Exception as error:
+        raise ApiNotAvailable(
+            'Общая ошибка API.'
+        ) from error
+    if response.status_code != HTTPStatus.OK:
+        raise ApiNotAvailable(
+            f'Код ответа API: {response.status_code}'
+        )
+    logger.debug(
+        f'API практикума доступно. Код: {response.status_code}'
+    )
+    try:
+        return response.json()
+    except Exception as error:
+        raise ApiJsonErorr(f'Ошибка преобразования json {error}')
 
 
 def check_response(response):
@@ -99,33 +85,21 @@ def check_response(response):
                 return homeworks
         except TypeError('Получен пустой список'):
             logger.error('Получен пустой список от API Практикум.Домашка')
-            return []
-        else:
-            return []
+    return []
 
 
 def parse_status(homework):
     """Извлечение данных из ответа API сайта Практикум.Домашка."""
-    if homework['id'] == 0:
-        logger.error('Работа на проверку не загружена')
-        return KeyError('Пустой список работ')
-    else:
-        homework_name_1 = homework.get('homework_name')
-        if homework_name_1 is None:
-            logger.error('Нет данных о работе')
-            return KeyError('Нет данных о работе')
-        else:
-            homework_status = homework.get('status')
-            if homework_status is None:
-                logger.error('Статус работы - пустой')
-                return KeyError('Статс работы неизвестен')
-            else:
-                homework_status = homework.get('status')
-                if homework_status in HOMEWORK_STATUSES:
-                    verdict = HOMEWORK_STATUSES.get(homework_status)
-                    text = 'Изменился статус проверки работы '
-                    logger.info(f'{text}"{homework_name_1}": {verdict}')
-                    return (f'{text}"{homework_name_1}": {verdict}')
+    homework_name = homework.get('homework_name')
+    homework_status = homework.get('status')
+    if homework_name is None:
+        logger.error(f'Нет значения {homework_name}')
+    if homework_status is None:
+        logger.error(f'Нет значения {homework_status}')
+    if homework_status in HOMEWORK_STATUSES:
+        verdict = HOMEWORK_STATUSES[homework_status]
+        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    raise KeyError('Неверное значение статуса')
 
 
 def check_tokens():
@@ -136,13 +110,11 @@ def check_tokens():
         'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID
     }
     token_error = ('Отсутствует переменная окружения: ')
-    result = None
-    for token in TOKEN_DICT.keys():
-        if (TOKEN_DICT[token] is None):
-            logger.critical(f'{token_error}{token}')
+    result = True
+    for token, value in TOKEN_DICT.items():
+        if value is None:
             result = False
-        else:
-            result = True
+            logger.critical(f'{token_error}{token}')
     return result
 
 
