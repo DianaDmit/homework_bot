@@ -40,10 +40,8 @@ def send_message(bot, message):
     """Отправка сообщения в Телеграм."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-    except Exception('Телеграм сервис недоступен'):
+    except Exception:
         logger.error('Телеграм сервис недоступен')
-    else:
-        logger.info('Сообщение для sat0304_bot отправлено')
 
 
 def get_api_answer(current_timestamp):
@@ -76,7 +74,7 @@ def check_response(response):
             cur_date = response['current_date']
             logger.info(f'Дата проверки API Практикум.Домашка {cur_date}')
             homeworks = response['homeworks']
-    except TypeError('Получен неправильный результат'):
+    except TypeError:
         logger.error('Получен неправильный результат')
     else:
         try:
